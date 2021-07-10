@@ -1,13 +1,31 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:adhara_socket_io/adhara_socket_io.dart';
 import 'package:flutter/material.dart';
 
 import 'data.dart';
 
-void main() => runApp(MyApp());
+const uri = 'https://tcp.disrupt-x.io:3004';
 
-const uri = 'http://192.168.0.105:7070/';
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext context) =>
+      super.createHttpClient(context)
+        ..badCertificateCallback =
+            (X509Certificate cert, String host, int port) {
+          print('host $host');
+          print('port $port');
+          print('cert ${cert.issuer}');
+          return true;
+        };
+}
+
+void main() {
+  HttpOverrides.global = MyHttpOverrides();
+  runApp(MyApp());
+}
 
 class MyApp extends StatefulWidget {
   @override
@@ -15,11 +33,8 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  List<String> toPrint = ['trying to connect'];
   SocketIOManager manager;
-  Map<String, SocketIO> sockets = {};
-  final _isProbablyConnected = <String, bool>{};
-  final ScrollController _scrollController = ScrollController();
+  SocketIO socket;
 
   @override
   void initState() {
@@ -29,185 +44,43 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> initSocket(String identifier) async {
-    setState(() => _isProbablyConnected[identifier] = true);
-    final socket = await manager.createInstance(SocketOptions(
-      //Socket IO server URI
-      uri,
-      namespace: (identifier == 'namespaced') ? '/adhara' : '/',
-      //Query params - can be used for authentication
-      query: {
-        'auth': '--SOME AUTH STRING---',
-        'info': 'new connection from adhara-socketio',
-        'timestamp': DateTime.now().toString()
-      },
-      //Enable or disable platform channel logging
-      enableLogging: true,
-      transports: [
-        Transports.webSocket,
-        // Transports.polling,
-      ], //Enable required transport
-    ));
-    socket.onConnect.listen((data) {
-      pPrint('$identifier | connected...');
-      pPrint(data);
-      sendMessage(identifier);
-    });
-    socket.onConnectError.listen(pPrint);
-    socket.onConnectTimeout.listen(pPrint);
-    socket.onError.listen(pPrint);
-    socket.onDisconnect.listen(pPrint);
-    socket
-        .on('type:string')
-        .listen((data) => pPrint('$identifier | type:string... | $data'));
-    socket
-        .on('type:bool')
-        .listen((data) => pPrint('$identifier | type:bool | $data'));
-    socket
-        .on('type:number')
-        .listen((data) => pPrint('$identifier | type:number | $data'));
-    socket
-        .on('type:object')
-        .listen((data) => pPrint('$identifier | type:object | $data'));
-    socket
-        .on('type:list')
-        .listen((data) => pPrint('$identifier | type:list | $data'));
-    socket.on('message').listen(pPrint);
-    socket.on('echo').listen((data) =>
-        pPrint('$identifier | echo received | ${data.length} | $data'));
-    socket
-        .on('namespace')
-        .listen((data) => pPrint('$identifier | namespace: | $data'));
-    //TODO add stream subscription in example
-    await socket.connect();
-    sockets[identifier] = socket;
-  }
+    StreamSubscription connectSubscription;
+    StreamSubscription echoSubscription;
 
-  bool isProbablyConnected(String identifier) =>
-      _isProbablyConnected[identifier] ?? false;
-
-  Future<void> disconnect(String identifier) async {
-    await manager.clearInstance(sockets[identifier]);
-    setState(() => _isProbablyConnected[identifier] = false);
-  }
-
-  void sendMessage(String identifier) {
-    if (sockets[identifier] != null) {
-      pPrint("sending message from '$identifier'...");
-      sockets[identifier].emit('data', messagesToPublish);
-      pPrint("Message emitted from '$identifier'...");
-    }
-  }
-
-  Future<void> sendEchoMessage(String identifier) async {
-    if (sockets[identifier] != null) {
-      for (final message in messagesToPublish) {
-        pPrint('publishing echo message $message');
-        await sockets[identifier].emit('echo', [message]);
-      }
-      pPrint('publishing echo message ${messagesToPublish.last}');
-      await sockets[identifier].emit('echo', messagesToPublish.last as List);
-    }
-  }
-
-  void sendMessageWithACK(String identifier) {
-    pPrint('$identifier | Sending ACK message...');
-    final msg = [
-      'Hello world!',
-      1,
-      true,
-      {'p': 1},
-      [3, 'r']
-    ];
-    sockets[identifier].emitWithAck('ack-message', msg).then((data) {
-      // this callback runs when this
-      // specific message is acknowledged by the server
-      pPrint('$identifier | ACK received | $msg -> $data');
-    });
-  }
-
-  void pPrint(Object data) {
-    setState(() {
-      if (data is Map) {
-        data = json.encode(data);
-      }
-      print(data);
-      toPrint.add(data?.toString());
-    });
-
-    Future.delayed(const Duration(milliseconds: 250), () {
-      _scrollController.animateTo(_scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200), curve: Curves.easeInOut);
-    });
-  }
-
-  Widget getButtonSet(String identifier) {
-    final ipc = isProbablyConnected(identifier);
-    return SizedBox(
-      height: 60,
-      child: Container(
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          children: <Widget>[
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              child: ElevatedButton(
-                onPressed: ipc ? null : () => initSocket(identifier),
-                style: ButtonStyle(
-                  padding: MaterialStateProperty.resolveWith(
-                    (states) => const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                ),
-                child: const Text('Connect'),
-              ),
-            ),
-            Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                child: ElevatedButton(
-                  onPressed: ipc ? () => sendMessage(identifier) : null,
-                  style: ButtonStyle(
-                    padding: MaterialStateProperty.resolveWith(
-                      (states) => const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                  ),
-                  child: const Text('Send Message'),
-                )),
-            Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                child: ElevatedButton(
-                  onPressed: ipc ? () => sendEchoMessage(identifier) : null,
-                  style: ButtonStyle(
-                    padding: MaterialStateProperty.resolveWith(
-                      (states) => const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                  ),
-                  child: const Text('Send Echo Message'),
-                )),
-            Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                child: ElevatedButton(
-                  onPressed: ipc ? () => sendMessageWithACK(identifier) : null,
-                  style: ButtonStyle(
-                    padding: MaterialStateProperty.resolveWith(
-                      (states) => const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                  ),
-                  child: const Text('Send w/ ACK'), //Send message with ACK
-                )),
-            Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8),
-                child: ElevatedButton(
-                  onPressed: ipc ? () => disconnect(identifier) : null,
-                  style: ButtonStyle(
-                    padding: MaterialStateProperty.resolveWith(
-                      (states) => const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                  ),
-                  child: const Text('Disconnect'),
-                )),
-          ],
-        ),
+    final value = await SocketIOManager().createInstance(
+      SocketOptions(
+        // 'https://tcp.disrupt-x.io:13579',
+        'https://deviot-back.disrupt-x.io',
+        transports: [
+          Transports.polling,
+        ],
+        auth: {
+          'token':
+              "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTEsImVtYWlsIjoiY3VzdG9tZXJAZGlzcnVwdC14LmlvIiwiaWF0IjoxNjI1OTI1NTA1LCJleHAiOjE2MjU5MjkxMDV9.AFugagYCyoYQWvndmzTwVdpPSdZOx9mhRKU3-JTuJf4",
+        },
+        path: '/socket/metrowatch',
+        enableLogging: true,
       ),
     );
+    socket = value;
+    // Listen to socket connect event
+    final subscription = socket.onConnect.listen((data) {
+      print('connected: $data');
+    }).onError((error) async {
+      print('error is $error');
+      await SocketIOManager().clearInstance(socket);
+    });
+    socket.on('connect_error').listen((event) {
+      print('connect error $event');
+    });
+    await socket.connectSync();
+    print('isConnected ${socket.isConnected()}');
+  }
+
+  @override
+  void dispose() {
+    SocketIOManager().clearInstance(socket);
+    super.dispose();
   }
 
   @override
@@ -235,60 +108,6 @@ class _MyAppState extends State<MyApp> {
                 disabledColor: Colors.lightBlueAccent.withOpacity(0.5),
                 buttonColor: Colors.lightBlue,
                 splashColor: Colors.cyan)),
-        home: Scaffold(
-          appBar: AppBar(
-            title: const Text('Adhara Socket.IO example'),
-            backgroundColor: Colors.black,
-            elevation: 0,
-            actions: [
-              IconButton(
-                  icon: const Icon(Icons.delete),
-                  onPressed: () {
-                    setState(() {
-                      toPrint = [];
-                    });
-                  })
-            ],
-          ),
-          body: Container(
-            color: Colors.black,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Expanded(
-                    child: Center(
-                  child: ListView(
-                    controller: _scrollController,
-                    children: toPrint.map((_) => Text(_ ?? '')).toList(),
-                  ),
-                )),
-                const Padding(
-                  padding: EdgeInsets.only(left: 8, bottom: 8),
-                  child: Text(
-                    'Default Connection',
-                  ),
-                ),
-                getButtonSet('default'),
-                const Padding(
-                  padding: EdgeInsets.only(left: 8, bottom: 8, top: 8),
-                  child: Text(
-                    'Alternate Connection',
-                  ),
-                ),
-                getButtonSet('alternate'),
-                const Padding(
-                  padding: EdgeInsets.only(left: 8, bottom: 8, top: 8),
-                  child: Text(
-                    'Namespace Connection',
-                  ),
-                ),
-                getButtonSet('namespaced'),
-                const SizedBox(
-                  height: 12,
-                )
-              ],
-            ),
-          ),
-        ),
+        home: Scaffold(),
       );
 }

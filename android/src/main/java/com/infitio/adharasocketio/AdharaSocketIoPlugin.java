@@ -118,6 +118,10 @@ public class AdharaSocketIoPlugin implements MethodCallHandler {
           if (socketOptions.containsKey("path")) {
             options.path = (String) socketOptions.get("path");
           }
+          if (socketOptions.containsKey("auth")) {
+            System.out.println("The auth is " + socketOptions.get("auth"));
+            options.auth = (Map<String, String>) socketOptions.get("auth");
+          }
           options.enableLogging = this.enableLogging;
           Log.e(TAG, "Creating a new instance");
           this.instances.put(this.currentIndex, AdharaSocket.getInstance(registrar, options));

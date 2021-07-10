@@ -17,6 +17,9 @@ class SocketOptions {
   /// Query params for socket URI
   final Map<String, String> query;
 
+  /// Auth
+  final Map<String, String> auth;
+
   ///Enable debug logging
   final bool enableLogging;
 
@@ -63,6 +66,7 @@ class SocketOptions {
   SocketOptions(
     this.uri, {
     this.query = const {},
+    this.auth = const {},
     this.enableLogging = false,
     this.transports = const [Transports.webSocket, Transports.polling],
     this.namespace = '/',
@@ -75,6 +79,7 @@ class SocketOptions {
         'uri': uri,
         'query': query,
         'path': path,
+        'auth': auth,
         'enableLogging': enableLogging,
         'namespace': namespace,
         'transports': transports

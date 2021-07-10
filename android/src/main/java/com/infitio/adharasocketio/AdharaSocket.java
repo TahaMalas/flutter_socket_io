@@ -109,6 +109,7 @@ class AdharaSocket implements MethodCallHandler {
     switch (call.method) {
       case PlatformConstants.PlatformMethod.connect: {
         log("Connecting to socket " + this.options.uri);
+        log("Connecting to socket " + this.options.auth);
         socket.connect();
         result.success(null);
         break;
