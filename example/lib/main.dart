@@ -49,14 +49,14 @@ class _MyAppState extends State<MyApp> {
 
     final value = await SocketIOManager().createInstance(
       SocketOptions(
-        // 'https://tcp.disrupt-x.io:13579',
+        // 'https://tcp.disrupt-x.io:3004',
         'https://deviot-back.disrupt-x.io',
         transports: [
           Transports.polling,
         ],
         auth: {
           'token':
-              "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTEsImVtYWlsIjoiY3VzdG9tZXJAZGlzcnVwdC14LmlvIiwiaWF0IjoxNjI1OTI1NTA1LCJleHAiOjE2MjU5MjkxMDV9.AFugagYCyoYQWvndmzTwVdpPSdZOx9mhRKU3-JTuJf4",
+              "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MTEsImVtYWlsIjoiY3VzdG9tZXJAZGlzcnVwdC14LmlvIiwiaWF0IjoxNjI1OTM1MzE0LCJleHAiOjE2MjU5Mzg5MTR9.wqqx5iccDDGXUJdARalZJIyUahw9NjVLf538duOusbc",
         },
         path: '/socket/metrowatch',
         enableLogging: true,

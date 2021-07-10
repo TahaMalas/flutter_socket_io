@@ -47,7 +47,7 @@ class AdharaSocket implements MethodCallHandler {
     this.channel = channel;
     this.options = options;
     log("Creating socket with URL: " + options.uri);
-    socket = AdharaSocket.manager.socket(options.namespace);
+    socket = AdharaSocket.manager.socket(options.namespace, options);
   }
 
   static AdharaSocket getInstance(Registrar registrar, Options options) throws URISyntaxException {
